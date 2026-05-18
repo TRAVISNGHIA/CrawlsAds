@@ -1,39 +1,37 @@
 import time
+import random
 from typing import List, Dict, Any, Optional
+
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+
 from core.logger import get_logger
 from services.url_resolver import resolve_final_url, extract_domain, clean_url
 
 logger = get_logger(__name__)
 
-# All known "sponsored" label texts Google uses
 SPONSORED_LABELS = [
     "Sponsored",
-    "Ad",
     "Quảng cáo",
     "Được tài trợ",
-    "Annonce",
-    "Anuncio",
-    "Reklam",
-    "广告",
+    "Ad",
 ]
 
-# CSS selectors for ad containers (Google changes these frequently)
-AD_CONTAINER_SELECTORS = [
-    "[data-text-ad]",
-    "div[aria-label='Ads']",
-    "div[aria-label='Ad']",
-    "#tads .uEierd",
-    "#tads > div",
-    ".commercial-unit-desktop-top",
-    ".pla-unit",
-    "div[data-hveid] > div[data-ved]",
-]
+GOOGLE_SEARCH_URL = "https://www.google.com.vn/search?q={query}&hl=vi&gl=vn"
 
-GOOGLE_SEARCH_URL = "https://www.google.com/search?q={query}&hl=vi"
+# Dấu hiệu trang CAPTCHA của Google
+CAPTCHA_SIGNALS = [
+    "google.com/sorry",
+    "recaptcha",
+    "captcha",
+    "unusual traffic",
+    "lưu lượng truy cập bất thường",
+    "automated queries",
+]
 
 
 def search_and_extract_ads(
@@ -43,27 +41,45 @@ def search_and_extract_ads(
     device: str,
     profile_name: str,
 ) -> List[Dict[str, Any]]:
-    """
-    Navigate to Google Search for the keyword and extract all ad results.
-    Returns a list of ad data dicts.
-    """
     url = GOOGLE_SEARCH_URL.format(query=keyword.replace(" ", "+"))
     ads = []
 
     try:
         logger.info(f"Searching: '{keyword}' on {device}")
         driver.get(url)
-        time.sleep(2)  # Let page settle
 
-        # Wait for results container
+        # Nghỉ ngẫu nhiên giả lập hành vi người dùng
+        time.sleep(random.uniform(2, 4))
+
+        # ── Kiểm tra CAPTCHA ──
+        if _is_captcha_page(driver):
+            logger.warning(
+                f"CAPTCHA detected cho '{keyword}'! "
+                f"URL hiện tại: {driver.current_url}"
+            )
+            # Chụp lại để debug
+            _try_screenshot_captcha(driver, run_id, keyword, device)
+            return []
+
+        # ── Chờ kết quả tìm kiếm ──
         try:
             WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.ID, "search"))
+                EC.any_of(
+                    EC.presence_of_element_located((By.ID, "search")),
+                    EC.presence_of_element_located((By.ID, "rso")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-async-context]")),
+                )
             )
-        except Exception:
-            logger.warning(f"Search results container not found for '{keyword}'")
+        except TimeoutException:
+            logger.warning(f"Search results không load được cho '{keyword}'")
+            # Kiểm tra lại CAPTCHA sau timeout
+            if _is_captcha_page(driver):
+                logger.warning(f"CAPTCHA sau timeout cho '{keyword}'")
+                return []
 
-        time.sleep(1)
+        # Scroll nhẹ giả lập đọc trang
+        _human_scroll(driver)
+
         ads = _extract_ads_from_page(driver, keyword, run_id, device, profile_name)
         logger.info(f"Found {len(ads)} ads for '{keyword}' on {device}")
 
@@ -73,6 +89,45 @@ def search_and_extract_ads(
     return ads
 
 
+def _is_captcha_page(driver: WebDriver) -> bool:
+    """Phát hiện Google đang hiện trang CAPTCHA/Sorry."""
+    current_url = driver.current_url.lower()
+    page_source = driver.page_source.lower()
+
+    for signal in CAPTCHA_SIGNALS:
+        if signal in current_url or signal in page_source:
+            return True
+    return False
+
+
+def _try_screenshot_captcha(driver: WebDriver, run_id: str, keyword: str, device: str):
+    """Lưu screenshot trang CAPTCHA để debug."""
+    try:
+        import os
+        from core.config import settings
+        safe_kw = keyword.replace(" ", "_")[:30]
+        path = os.path.join(
+            settings.SCREENSHOTS_DIR,
+            f"CAPTCHA_{run_id}_{safe_kw}_{device}.png"
+        )
+        driver.save_screenshot(path)
+        logger.info(f"CAPTCHA screenshot saved: {path}")
+    except Exception:
+        pass
+
+
+def _human_scroll(driver: WebDriver):
+    """Scroll nhẹ giả lập người dùng đọc trang."""
+    try:
+        scroll_distance = random.randint(200, 500)
+        driver.execute_script(f"window.scrollTo(0, {scroll_distance});")
+        time.sleep(random.uniform(0.3, 0.8))
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(random.uniform(0.2, 0.5))
+    except Exception:
+        pass
+
+
 def _extract_ads_from_page(
     driver: WebDriver,
     keyword: str,
@@ -80,15 +135,28 @@ def _extract_ads_from_page(
     device: str,
     profile_name: str,
 ) -> List[Dict[str, Any]]:
-    """Extract ad information from the current search results page."""
     ads = []
 
-    # Strategy 1: Find by sponsored label text
-    ad_blocks = _find_ad_blocks_by_label(driver)
+    # Strategy 1: Tìm theo data-text-ad (chính xác nhất)
+    ad_blocks = driver.find_elements(
+        By.XPATH,
+        "//span[text()='Quảng cáo' or text()='Sponsored' or text()='Được tài trợ' or text()='Ad']"
+        "/ancestor::div[@data-text-ad]"
+    )
 
-    # Strategy 2: Find by known ad container selectors
+    # Strategy 2: Tìm theo ancestor div[1]
     if not ad_blocks:
-        ad_blocks = _find_ad_blocks_by_selector(driver)
+        ad_blocks = driver.find_elements(
+            By.XPATH,
+            "//span[text()='Quảng cáo' or text()='Sponsored' or text()='Được tài trợ' or text()='Ad']"
+            "/ancestor::div[1]"
+        )
+
+    # Strategy 3: Tìm theo #tads
+    if not ad_blocks:
+        tads = driver.find_elements(By.CSS_SELECTOR, "#tads > div")
+        if tads:
+            ad_blocks = tads
 
     if not ad_blocks:
         logger.info(f"No ad blocks found for '{keyword}'")
@@ -100,59 +168,9 @@ def _extract_ads_from_page(
             if ad_data:
                 ads.append(ad_data)
         except Exception as e:
-            logger.warning(f"Error parsing ad block at position {position}: {e}")
+            logger.warning(f"Error parsing ad block position {position}: {e}")
 
     return ads
-
-
-def _find_ad_blocks_by_label(driver: WebDriver):
-    """Find ad containers by locating sponsored label text."""
-    ad_blocks = []
-    try:
-        # Find all elements containing sponsored text
-        for label in SPONSORED_LABELS:
-            elements = driver.find_elements(
-                By.XPATH, f"//*[contains(text(), '{label}')]"
-            )
-            for el in elements:
-                # Walk up to find the ad container div
-                container = _get_ad_container(el)
-                if container and container not in ad_blocks:
-                    ad_blocks.append(container)
-    except Exception as e:
-        logger.warning(f"Label-based ad detection failed: {e}")
-    return ad_blocks
-
-
-def _find_ad_blocks_by_selector(driver: WebDriver):
-    """Find ad containers using CSS selectors."""
-    for selector in AD_CONTAINER_SELECTORS:
-        try:
-            elements = driver.find_elements(By.CSS_SELECTOR, selector)
-            if elements:
-                logger.debug(f"Found ads via selector: {selector}")
-                return elements
-        except Exception:
-            continue
-    return []
-
-
-def _get_ad_container(element):
-    """Walk up DOM tree to find a meaningful ad container."""
-    try:
-        current = element
-        for _ in range(6):
-            parent = current.find_element(By.XPATH, "..")
-            tag = parent.tag_name.lower()
-            if tag in ("body", "html"):
-                break
-            # Look for divs with some content
-            if tag == "div" and len(parent.text) > 20:
-                return parent
-            current = parent
-    except Exception:
-        pass
-    return element
 
 
 def _parse_ad_block(
@@ -163,23 +181,18 @@ def _parse_ad_block(
     device: str,
     profile_name: str,
 ) -> Optional[Dict[str, Any]]:
-    """Extract structured data from an ad block element."""
     try:
-        block_text = block.text.strip()
-        if not block_text:
+        if not block.text.strip():
             return None
 
-        # Extract title (usually the first link text or largest heading)
         ad_title = _extract_title(block)
         if not ad_title:
             return None
 
-        # Extract URL
         raw_url = _extract_href(block)
         advertiser = _extract_advertiser(block)
         visible_domain = _extract_visible_domain(block)
 
-        # Resolve final URL
         final_url = None
         final_domain = None
         if raw_url:
@@ -213,26 +226,20 @@ def _parse_ad_block(
 
 
 def _extract_title(block) -> Optional[str]:
-    """Extract the ad headline/title."""
-    selectors = ["h3", "h2", "[role='heading']", "a[href]"]
-    for sel in selectors:
+    for sel in ["h3", "h2", "[role='heading']"]:
         try:
-            elements = block.find_elements(By.CSS_SELECTOR, sel)
-            for el in elements:
+            els = block.find_elements(By.CSS_SELECTOR, sel)
+            for el in els:
                 text = el.text.strip()
                 if text and len(text) > 3:
                     return text[:200]
         except Exception:
             continue
-    # Fallback: first non-empty line
     lines = [l.strip() for l in block.text.split("\n") if l.strip()]
-    if lines:
-        return lines[0][:200]
-    return None
+    return lines[0][:200] if lines else None
 
 
 def _extract_href(block) -> Optional[str]:
-    """Extract the main link URL from ad block."""
     try:
         links = block.find_elements(By.CSS_SELECTOR, "a[href]")
         for link in links:
@@ -245,27 +252,26 @@ def _extract_href(block) -> Optional[str]:
 
 
 def _extract_advertiser(block) -> Optional[str]:
-    """Try to extract advertiser name from ad block."""
     try:
-        # Google sometimes shows advertiser in specific spans
-        candidates = block.find_elements(By.CSS_SELECTOR, "span.x2VHCd, .yCgKKc, .vNuEHb")
-        for el in candidates:
-            text = el.text.strip()
-            if text:
-                return text[:100]
+        for sel in ["span.x2VHCd", ".yCgKKc", ".vNuEHb", "span[data-dtld]"]:
+            els = block.find_elements(By.CSS_SELECTOR, sel)
+            for el in els:
+                text = el.text.strip()
+                if text:
+                    return text[:100]
     except Exception:
         pass
     return None
 
 
 def _extract_visible_domain(block) -> Optional[str]:
-    """Extract the displayed domain/URL from ad block."""
     try:
-        candidates = block.find_elements(By.CSS_SELECTOR, "span.qzEoUe, .VDgVie, cite, .UdQCqe")
-        for el in candidates:
-            text = el.text.strip()
-            if text and "." in text:
-                return text[:100]
+        for sel in ["span.qzEoUe", ".VDgVie", "cite", ".UdQCqe"]:
+            els = block.find_elements(By.CSS_SELECTOR, sel)
+            for el in els:
+                text = el.text.strip()
+                if text and "." in text:
+                    return text[:100]
     except Exception:
         pass
     return None

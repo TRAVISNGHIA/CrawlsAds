@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     MONGO_DB_NAME: str = "sem_checker"
     CHROME_BINARY: str = ""
     CHROME_PROFILE_ROOT: str = ""
-    CHROME_PROFILE_CLONE_ROOT: str = "/tmp/sem_checker_profiles"
+    CHROME_PROFILE_CLONE_ROOT: str = "/home/nghia/.config/google-chrome-clone"
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
     FRONTEND_URL: str = "http://localhost:5173"
