@@ -4,7 +4,7 @@ export interface CrawlStartPayload {
   keywords: string[]
   devices: string[]
   profiles: string[]
-  headless: boolean
+
 }
 
 export interface CrawlRun {

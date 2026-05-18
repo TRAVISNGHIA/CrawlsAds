@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 class CrawlRun(BaseModel):
     run_id: str
-    status: str = "pending"  # pending | running | completed | failed
+    status: str = "pending"
     total_keywords: int = 0
     processed_keywords: int = 0
     devices: List[str] = []
@@ -38,4 +38,3 @@ class CrawlStartRequest(BaseModel):
     keywords: List[str]
     devices: List[str] = ["desktop"]
     profiles: List[str] = ["Default"]
-    headless: bool = False

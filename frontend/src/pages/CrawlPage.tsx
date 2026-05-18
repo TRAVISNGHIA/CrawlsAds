@@ -40,7 +40,7 @@ export default function CrawlPage() {
         keywords: kws,
         devices,
         profiles: profiles.split(',').map(p => p.trim()).filter(Boolean),
-        headless,
+
       })
       setRunId(res.run_id)
       startPolling(res.run_id)

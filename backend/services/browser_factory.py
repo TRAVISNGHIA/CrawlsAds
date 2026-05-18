@@ -9,17 +9,11 @@ logger = get_logger(__name__)
 
 
 def create_browser(device_name: str, profile_name: str, headless: bool = False):
-    """
-    Tạo Chrome instance với profile clone 2 lớp:
-      --user-data-dir  = clone_root  (CHROME_PROFILE_CLONE_ROOT/profile_name)
-      --profile-directory = profile_name
-    """
     device = get_device_config(device_name)
     clone_root = seed_profile_if_needed(profile_name)
 
     options = uc.ChromeOptions()
 
-    # ── Stability ──
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
@@ -27,8 +21,6 @@ def create_browser(device_name: str, profile_name: str, headless: bool = False):
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-popup-blocking")
     options.add_argument("--disable-infobars")
-
-    # ── Stealth — ẩn dấu hiệu bot ──
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--disable-features=IsolateOrigins,site-per-process")
     options.add_argument("--allow-running-insecure-content")
@@ -40,12 +32,9 @@ def create_browser(device_name: str, profile_name: str, headless: bool = False):
     options.add_argument(f"--profile-directory={profile_name}")
     options.add_argument(f"--user-agent={device.user_agent}")
 
-    # ── Ngôn ngữ tiếng Việt ──
     options.add_argument("--lang=vi-VN")
     options.add_argument("--accept-lang=vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7")
-
-    if headless:
-        options.add_argument("--headless=new")
+    options.add_argument("--headless=new")
 
     if settings.CHROME_BINARY:
         options.binary_location = settings.CHROME_BINARY
@@ -67,8 +56,7 @@ def create_browser(device_name: str, profile_name: str, headless: bool = False):
             _apply_mobile_emulation(driver, device)
 
         logger.info(
-            f"Browser created | device={device_name}, profile={profile_name}, "
-            f"headless={headless}, user_data_dir={clone_root}"
+            f"Browser created | device={device_name}, profile={profile_name}, user_data_dir={clone_root}"
         )
         return driver
 
@@ -78,24 +66,19 @@ def create_browser(device_name: str, profile_name: str, headless: bool = False):
 
 
 def _apply_stealth(driver, device: DeviceConfig):
-    """Inject script ẩn webdriver fingerprint ngay khi page load."""
     try:
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
-                // Ẩn navigator.webdriver
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 
-                // Giả lập plugins như trình duyệt thật
                 Object.defineProperty(navigator, 'plugins', {
                     get: () => [1, 2, 3, 4, 5],
                 });
 
-                // Ngôn ngữ
                 Object.defineProperty(navigator, 'languages', {
                     get: () => ['vi-VN', 'vi', 'en-US', 'en'],
                 });
 
-                // Xóa chrome.runtime dấu hiệu automation
                 window.chrome = {
                     runtime: {},
                     loadTimes: function() {},
@@ -103,7 +86,6 @@ def _apply_stealth(driver, device: DeviceConfig):
                     app: {},
                 };
 
-                // Che permission query
                 const originalQuery = window.navigator.permissions.query;
                 window.navigator.permissions.query = (parameters) => (
                     parameters.name === 'notifications'
@@ -117,7 +99,6 @@ def _apply_stealth(driver, device: DeviceConfig):
 
 
 def _apply_mobile_emulation(driver, device: DeviceConfig):
-    """Áp dụng emulation mobile/tablet qua Chrome DevTools Protocol."""
     try:
         driver.execute_cdp_cmd("Network.enable", {})
 

@@ -33,7 +33,6 @@ async def start_crawl_job(request: CrawlStartRequest) -> str:
     await db.crawl_runs.insert_one(run.model_dump())
     logger.info(f"Crawl job created: {run_id}")
 
-    # asyncio.create_task — chạy trên cùng loop, không tạo loop mới
     asyncio.create_task(
         _run_crawl_async(
             run_id=run_id,

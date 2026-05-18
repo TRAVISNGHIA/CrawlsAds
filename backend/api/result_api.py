@@ -9,7 +9,6 @@ logger = get_logger(__name__)
 
 
 def _serialize(doc: dict) -> dict:
-    """Convert MongoDB document to JSON-serializable dict."""
     if doc and "_id" in doc:
         doc["_id"] = str(doc["_id"])
     return doc

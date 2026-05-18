@@ -32,7 +32,6 @@ async def start_crawl(request: CrawlStartRequest):
         "profiles": request.profiles,
     }
 
-
 @router.get("/crawl/status/{run_id}")
 async def get_crawl_status(run_id: str):
     db = get_db()
