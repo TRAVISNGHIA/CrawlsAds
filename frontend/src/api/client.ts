@@ -4,7 +4,6 @@ export interface CrawlStartPayload {
   keywords: string[]
   devices: string[]
   profiles: string[]
-
 }
 
 export interface CrawlRun {
@@ -45,6 +44,21 @@ export interface Stats {
   total_ads_found: number
   total_unique_keywords: number
   latest_run?: CrawlRun
+}
+
+export interface KeywordDoc {
+  _id: string
+  keyword: string
+  created_at?: string
+  last_crawled_at?: string | null
+  crawl_count?: number
+}
+
+export interface KeywordPage {
+  items: KeywordDoc[]
+  total: number
+  page: number
+  limit: number
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -102,4 +116,53 @@ export const api = {
   },
 
   getStats: () => request<Stats>('/stats'),
+
+  getSchedulerConfig: async (): Promise<any> => {
+    const res = await fetch('/api/crawl/auto/config', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) throw new Error('Không thể lấy cấu hình scheduler')
+    return res.json()
+  },
+
+  updateSchedulerConfig: async (config: any): Promise<any> => {
+    const res = await fetch('/api/crawl/auto/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    })
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}))
+      throw new Error(error.message || 'Không thể cập nhật scheduler config')
+    }
+    return res.json()
+  },
+  getKeywords: (params: {
+    page?: number
+    limit?: number
+    search?: string
+  }): Promise<KeywordPage> => {
+    const q = new URLSearchParams()
+    if (params.page)   q.set('page',   String(params.page))
+    if (params.limit)  q.set('limit',  String(params.limit))
+    if (params.search) q.set('search', params.search)
+    const qs = q.toString()
+    return request<KeywordPage>(`/keywords${qs ? '?' + qs : ''}`)
+  },
+
+  addKeywords: (keywords: string[]): Promise<{ inserted: number; skipped: number; message: string }> =>
+    request('/keywords', {
+      method: 'POST',
+      body: JSON.stringify({ keywords }),
+    }),
+
+  updateKeyword: (id: string, keyword: string): Promise<{ status: string; keyword: string }> =>
+    request(`/keywords/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ keyword }),
+    }),
+
+  deleteKeyword: (id: string): Promise<{ status: string; deleted: string }> =>
+    request(`/keywords/${id}`, { method: 'DELETE' }),
 }

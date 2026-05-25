@@ -1,10 +1,21 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, TableProperties, Radar } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Search,
+  TableProperties,
+  Radar,
+  Database,
+  Clock3,
+  Play
+} from 'lucide-react'
+
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/crawl', label: 'Crawl', icon: Search },
+  { to: '/manual-crawl', label: 'Crawl Thủ Công', icon: Play },
+  { to: '/auto-crawl', label: 'Auto Crawl', icon: Clock3 },
+  { to: '/keywords', label: 'Keywords', icon: Database },
   { to: '/results', label: 'Results', icon: TableProperties },
 ]
 

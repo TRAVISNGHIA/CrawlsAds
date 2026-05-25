@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Union, Optional
+from pydantic import BaseModel, field_validator, model_validator
 
 from pydantic import BaseModel, Field
 
@@ -35,6 +36,25 @@ class AdResult(BaseModel):
 
 
 class CrawlStartRequest(BaseModel):
-    keywords: List[str]
-    devices: List[str] = ["desktop"]
-    profiles: List[str] = ["Default"]
+    keywords: Union[str, List[str]]
+    devices: Union[str, List[str]] = "desktop"
+    profiles: Union[str, List[str]] = "Default"
+
+    @field_validator('keywords', 'devices', 'profiles', mode='before')
+    @classmethod
+    def convert_to_list(cls, v):
+        if isinstance(v, str):
+            return [v]
+        if isinstance(v, list):
+            return v
+        raise ValueError('Must be string or list of strings')
+
+    @model_validator(mode='after')
+    def normalize_lists(self):
+        if isinstance(self.keywords, str):
+            self.keywords = [self.keywords]
+        if isinstance(self.devices, str):
+            self.devices = [self.devices]
+        if isinstance(self.profiles, str):
+            self.profiles = [self.profiles]
+        return self

@@ -121,7 +121,6 @@ Content-Type: application/json
   "keywords": ["buy laptop", "online loan"],
   "devices": ["desktop", "mobile"],
   "profiles": ["Default"],
-  "headless": false
 }
 ```
 Response:
@@ -238,7 +237,6 @@ rm -f /tmp/sem_checker_profiles/profile_Default/Singleton*
 Install Chrome dependencies:
 ```bash
 sudo apt install -y xvfb libgconf-2-4 libnss3 libgbm1
-# Or run with headless=true in the crawl request
 ```
 
 ### MongoDB Connection Failed

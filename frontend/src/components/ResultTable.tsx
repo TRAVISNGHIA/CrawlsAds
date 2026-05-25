@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ExternalLink, Image, ChevronDown, ChevronUp, Monitor, Smartphone, Tablet } from 'lucide-react'
 import type { AdResult } from '../api/client'
 
@@ -25,73 +26,153 @@ interface RowDetailProps {
 function ResultModal({ result, onClose }: RowDetailProps) {
   const screenshotUrl = result.screenshot_path ? `/${result.screenshot_path}` : null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}
-      style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 fade-in"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-bright)' }}
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              {result.ad_title || 'No Title'}
-            </h3>
-            <p className="text-sm mono mt-1" style={{ color: 'var(--text-muted)' }}>
-              {result.keyword} · {result.device} · {result.profile_name}
+  return createPortal(
+  <div
+    className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+    onClick={onClose}
+    style={{
+      background: 'rgba(0,0,0,0.8)',
+      backdropFilter: 'blur(4px)',
+    }}
+  >
+    <div
+      className="rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 fade-in"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-bright)',
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3
+            className="text-lg font-bold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {result.ad_title || 'No Title'}
+          </h3>
+
+          <p
+            className="text-sm mono mt-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {result.keyword} · {result.device} · {result.profile_name}
+          </p>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="text-sm px-3 py-1 rounded-lg transition-colors"
+          style={{
+            color: 'var(--text-secondary)',
+            background: 'var(--bg-secondary)',
+          }}
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+        {[
+          ['Advertiser', result.advertiser],
+          ['Visible Domain', result.visible_domain],
+          ['Final Domain', result.final_domain],
+          ['Position', result.ad_position],
+          ['Has Ads', result.has_ads ? 'Yes' : 'No'],
+          ['Created', new Date(result.created_at).toLocaleString()],
+        ].map(([label, value]) => (
+          <div
+            key={label as string}
+            className="rounded-lg p-3"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <p
+              className="text-xs mb-1"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {label}
+            </p>
+
+            <p
+              className="font-medium mono break-all"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {value != null && value !== ''
+                ? String(value)
+                : '—'}
             </p>
           </div>
-          <button onClick={onClose} className="text-sm px-3 py-1 rounded-lg transition-colors"
-            style={{ color: 'var(--text-secondary)', background: 'var(--bg-secondary)' }}>
-            Close
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-          {[
-            ['Advertiser', result.advertiser],
-            ['Visible Domain', result.visible_domain],
-            ['Final Domain', result.final_domain],
-            ['Position', result.ad_position],
-            ['Has Ads', result.has_ads ? 'Yes' : 'No'],
-            ['Created', new Date(result.created_at).toLocaleString()],
-          ].map(([label, value]) => (
-            <div key={label as string} className="rounded-lg p-3" style={{ background: 'var(--bg-secondary)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{label}</p>
-              <p className="font-medium mono break-all" style={{ color: 'var(--text-primary)' }}>
-                {value != null && value !== '' ? String(value) : '—'}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {result.raw_url && (
-          <div className="rounded-lg p-3 mb-3" style={{ background: 'var(--bg-secondary)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Raw URL</p>
-            <p className="text-xs mono break-all" style={{ color: 'var(--cyan)' }}>{result.raw_url}</p>
-          </div>
-        )}
-
-        {result.final_url && (
-          <div className="rounded-lg p-3 mb-4" style={{ background: 'var(--bg-secondary)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Final URL</p>
-            <a href={result.final_url} target="_blank" rel="noopener noreferrer"
-              className="text-xs mono break-all hover:underline" style={{ color: 'var(--accent)' }}>
-              {result.final_url}
-            </a>
-          </div>
-        )}
-
-        {screenshotUrl && (
-          <div>
-            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Screenshot</p>
-            <img src={screenshotUrl} alt="Screenshot" className="w-full rounded-lg border"
-              style={{ borderColor: 'var(--border)' }} />
-          </div>
-        )}
+        ))}
       </div>
+
+      {result.raw_url && (
+        <div
+          className="rounded-lg p-3 mb-3"
+          style={{ background: 'var(--bg-secondary)' }}
+        >
+          <p
+            className="text-xs mb-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Raw URL
+          </p>
+
+          <p
+            className="text-xs mono break-all"
+            style={{ color: 'var(--cyan)' }}
+          >
+            {result.raw_url}
+          </p>
+        </div>
+      )}
+
+      {result.final_url && (
+        <div
+          className="rounded-lg p-3 mb-4"
+          style={{ background: 'var(--bg-secondary)' }}
+        >
+          <p
+            className="text-xs mb-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Final URL
+          </p>
+
+          <a
+            href={result.final_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs mono break-all hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            {result.final_url}
+          </a>
+        </div>
+      )}
+
+      {screenshotUrl && (
+        <div>
+          <p
+            className="text-xs mb-2"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Screenshot
+          </p>
+
+          <img
+            src={screenshotUrl}
+            alt="Screenshot"
+            className="w-full rounded-lg border"
+            style={{ borderColor: 'var(--border)' }}
+          />
+        </div>
+      )}
     </div>
-  )
+  </div>,
+  document.body
+)
 }
+
 
 export default function ResultTable({ results }: Props) {
   const [selected, setSelected] = useState<AdResult | null>(null)
