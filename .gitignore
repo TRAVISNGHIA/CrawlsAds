@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Environment Variables
+.env
+.env.*
+
+# Node
+node_modules/
+
+# Vite Cache
+.vite/
+
+# Build
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Crawl Data
+backend/storage/html/
+backend/storage/screenshots/
+
+# OS
+.DS_Store
