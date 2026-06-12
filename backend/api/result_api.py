@@ -21,11 +21,14 @@ async def get_results(
     domain: Optional[str] = Query(None),
     run_id: Optional[str] = Query(None),
     has_ads: Optional[bool] = Query(None),
+    location_uule: Optional[str] = Query(None),
+    location_name: Optional[str] = Query(None),
     limit: int = Query(200, le=500),
     skip: int = Query(0, ge=0),
 ):
     db = get_db()
     query = {}
+
     if keyword:
         query["keyword"] = {"$regex": keyword, "$options": "i"}
     if device:
@@ -36,6 +39,10 @@ async def get_results(
         query["run_id"] = run_id
     if has_ads is not None:
         query["has_ads"] = has_ads
+    if location_uule:
+        query["location_uule"] = location_uule
+    if location_name:
+        query["location_name"] = {"$regex": location_name, "$options": "i"}
 
     cursor = db.ad_results.find(query).sort("created_at", -1).skip(skip).limit(limit)
     results = await cursor.to_list(length=limit)
@@ -82,7 +89,6 @@ async def get_stats():
     total_ads = await db.ad_results.count_documents({"has_ads": True})
     total_keywords = await db.ad_results.distinct("keyword")
 
-    # Latest run
     latest_run = await db.crawl_runs.find_one(
         {}, {"_id": 0}, sort=[("started_at", -1)]
     )

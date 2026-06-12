@@ -4,6 +4,7 @@ export interface CrawlStartPayload {
   keywords: string[]
   devices: string[]
   profiles: string[]
+  locations: string[]
 }
 
 export interface CrawlRun {
@@ -13,6 +14,7 @@ export interface CrawlRun {
   processed_keywords: number
   devices: string[]
   profiles: string[]
+  locations: string[]
   started_at: string
   finished_at?: string
   error?: string
@@ -25,6 +27,8 @@ export interface AdResult {
   keyword: string
   device: string
   profile_name: string
+  location_uule?: string
+  location_name?: string
   has_ads: boolean
   ad_position: number
   ad_title?: string
@@ -49,6 +53,7 @@ export interface Stats {
 export interface KeywordDoc {
   _id: string
   keyword: string
+  enabled?: boolean
   created_at?: string
   last_crawled_at?: string | null
   crawl_count?: number
@@ -61,6 +66,25 @@ export interface KeywordPage {
   limit: number
 }
 
+export interface LocationDoc {
+  _id: string
+  uule: string
+  name: string
+  created_at?: string
+}
+
+export interface LocationList {
+  items: LocationDoc[]
+  total: number
+}
+
+export interface SchedulerConfig {
+  enabled: boolean
+  times_per_day: number
+  devices: string[]
+  profiles: string[]
+  locations: string[]
+}
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -93,17 +117,21 @@ export const api = {
     domain?: string
     run_id?: string
     has_ads?: boolean
+    location_uule?: string
+    location_name?: string
     limit?: number
     skip?: number
   }) => {
     const q = new URLSearchParams()
-    if (params?.keyword) q.set('keyword', params.keyword)
-    if (params?.device) q.set('device', params.device)
-    if (params?.domain) q.set('domain', params.domain)
-    if (params?.run_id) q.set('run_id', params.run_id)
+    if (params?.keyword)       q.set('keyword', params.keyword)
+    if (params?.device)        q.set('device', params.device)
+    if (params?.domain)        q.set('domain', params.domain)
+    if (params?.run_id)        q.set('run_id', params.run_id)
     if (params?.has_ads !== undefined) q.set('has_ads', String(params.has_ads))
-    if (params?.limit) q.set('limit', String(params.limit))
-    if (params?.skip) q.set('skip', String(params.skip))
+    if (params?.location_uule) q.set('location_uule', params.location_uule)
+    if (params?.location_name) q.set('location_name', params.location_name)
+    if (params?.limit)         q.set('limit', String(params.limit))
+    if (params?.skip)          q.set('skip', String(params.skip))
     const qs = q.toString()
     return request<{ results: AdResult[]; total: number }>(`/results${qs ? '?' + qs : ''}`)
   },
@@ -117,35 +145,23 @@ export const api = {
 
   getStats: () => request<Stats>('/stats'),
 
-  getSchedulerConfig: async (): Promise<any> => {
-    const res = await fetch('/api/crawl/auto/config', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    if (!res.ok) throw new Error('Không thể lấy cấu hình scheduler')
-    return res.json()
-  },
+  getSchedulerConfig: (): Promise<SchedulerConfig> =>
+    request<SchedulerConfig>('/crawl/auto/config'),
 
-  updateSchedulerConfig: async (config: any): Promise<any> => {
-    const res = await fetch('/api/crawl/auto/config', {
+  updateSchedulerConfig: (config: SchedulerConfig): Promise<{ status: string; config: SchedulerConfig }> =>
+    request('/crawl/auto/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
-    })
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}))
-      throw new Error(error.message || 'Không thể cập nhật scheduler config')
-    }
-    return res.json()
-  },
+    }),
+
   getKeywords: (params: {
     page?: number
     limit?: number
     search?: string
   }): Promise<KeywordPage> => {
     const q = new URLSearchParams()
-    if (params.page)   q.set('page',   String(params.page))
-    if (params.limit)  q.set('limit',  String(params.limit))
+    if (params.page)   q.set('page', String(params.page))
+    if (params.limit)  q.set('limit', String(params.limit))
     if (params.search) q.set('search', params.search)
     const qs = q.toString()
     return request<KeywordPage>(`/keywords${qs ? '?' + qs : ''}`)
@@ -165,4 +181,28 @@ export const api = {
 
   deleteKeyword: (id: string): Promise<{ status: string; deleted: string }> =>
     request(`/keywords/${id}`, { method: 'DELETE' }),
+
+  toggleKeyword: (id: string): Promise<{ status: string; enabled: boolean }> =>
+    request(`/keywords/${id}/toggle`, { method: 'PATCH' }),
+
+  getLocations: (): Promise<LocationList> =>
+    request<LocationList>('/locations'),
+
+  addLocation: (uule: string, name: string): Promise<{ status: string; location: LocationDoc }> =>
+    request('/locations', {
+      method: 'POST',
+      body: JSON.stringify({ uule, name }),
+    }),
+
+  updateLocation: (
+    id: string,
+    data: { uule?: string; name?: string }
+  ): Promise<{ status: string; updated: object }> =>
+    request(`/locations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteLocation: (id: string): Promise<{ status: string; deleted: string }> =>
+    request(`/locations/${id}`, { method: 'DELETE' }),
 }

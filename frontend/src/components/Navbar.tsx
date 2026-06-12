@@ -2,20 +2,20 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
-  Search,
   TableProperties,
   Radar,
   Database,
   Clock3,
-  Play
+  Play,
+  MapPin,
 } from 'lucide-react'
-
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/manual-crawl', label: 'Crawl Thủ Công', icon: Play },
   { to: '/auto-crawl', label: 'Auto Crawl', icon: Clock3 },
   { to: '/keywords', label: 'Keywords', icon: Database },
+  { to: '/locations',label: 'Locations',     icon: MapPin },
   { to: '/results', label: 'Results', icon: TableProperties },
 ]
 
@@ -41,7 +41,7 @@ export default function Navbar() {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                 isActive
                   ? 'text-white'
                   : 'hover:text-white'

@@ -1,9 +1,18 @@
 from datetime import datetime, timezone
 from typing import List, Union, Optional
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from pydantic import BaseModel, Field
+class Location(BaseModel):
+    uule: str
+    name: str
 
+class LocationCreateRequest(BaseModel):
+    uule: str
+    name: str
+
+class LocationUpdateRequest(BaseModel):
+    uule: Optional[str] = None
+    name: Optional[str] = None
 
 class CrawlRun(BaseModel):
     run_id: str
@@ -12,6 +21,7 @@ class CrawlRun(BaseModel):
     processed_keywords: int = 0
     devices: List[str] = []
     profiles: List[str] = []
+    locations: List[str] = []
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     error: Optional[str] = None
@@ -22,6 +32,8 @@ class AdResult(BaseModel):
     keyword: str
     device: str
     profile_name: str
+    location_uule: Optional[str] = None   # mã UULE (None = không giả lập vị trí)
+    location_name: Optional[str] = None   # tên địa điểm để hiển thị
     has_ads: bool = False
     ad_position: int = 0
     ad_title: Optional[str] = None
@@ -39,12 +51,15 @@ class CrawlStartRequest(BaseModel):
     keywords: Union[str, List[str]]
     devices: Union[str, List[str]] = "desktop"
     profiles: Union[str, List[str]] = "Default"
+    locations: Union[str, List[str]] = []
 
-    @field_validator('keywords', 'devices', 'profiles', mode='before')
+    @field_validator('keywords', 'devices', 'profiles', 'locations', mode='before')
     @classmethod
     def convert_to_list(cls, v):
+        if v is None:
+            return []
         if isinstance(v, str):
-            return [v]
+            return [v] if v else []
         if isinstance(v, list):
             return v
         raise ValueError('Must be string or list of strings')
@@ -57,4 +72,6 @@ class CrawlStartRequest(BaseModel):
             self.devices = [self.devices]
         if isinstance(self.profiles, str):
             self.profiles = [self.profiles]
+        if isinstance(self.locations, str):
+            self.locations = [self.locations] if self.locations else []
         return self

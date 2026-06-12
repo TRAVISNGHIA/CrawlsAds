@@ -10,13 +10,11 @@ logger = get_logger(__name__)
 def capture_full_page_screenshot(driver: WebDriver, output_path: str):
     try:
         time.sleep(1)
-
-        # ✅ Dùng CDP để chụp full page — không cần set_window_size (tránh crash Chrome)
         result = driver.execute_cdp_cmd(
             "Page.captureScreenshot",
             {
                 "format": "png",
-                "captureBeyondViewport": True,  # chụp toàn bộ trang, kể cả phần cuộn
+                "captureBeyondViewport": True,
                 "clip": None,
             },
         )
@@ -30,7 +28,6 @@ def capture_full_page_screenshot(driver: WebDriver, output_path: str):
 
     except Exception as e:
         logger.error(f"Screenshot failed: {e}")
-        # ── Fallback: chụp viewport thông thường nếu CDP thất bại ──
         try:
             driver.save_screenshot(output_path)
             logger.info(f"Screenshot saved (fallback): {output_path}")
